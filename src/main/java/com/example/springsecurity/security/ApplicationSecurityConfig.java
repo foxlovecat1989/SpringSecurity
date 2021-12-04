@@ -1,23 +1,18 @@
 package com.example.springsecurity.security;
 
+import com.example.springsecurity.service.ApplicationUserServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
-
 import java.util.concurrent.TimeUnit;
-
-import static com.example.springsecurity.security.ApplicationUserPermission.*;
 import static com.example.springsecurity.security.ApplicationUserRole.*;
 
 @Configuration
@@ -27,10 +22,18 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
 
 
     private final PasswordEncoder passwordEncoder;
+    private final ApplicationUserServiceImpl applicationUserService;
 
     @Autowired
-    public ApplicationSecurityConfig(PasswordEncoder passwordEncoder) {
+    public ApplicationSecurityConfig(PasswordEncoder passwordEncoder, ApplicationUserServiceImpl applicationUserService) {
         this.passwordEncoder = passwordEncoder;
+        this.applicationUserService = applicationUserService;
+    }
+
+    public ApplicationSecurityConfig(boolean disableDefaults, PasswordEncoder passwordEncoder, ApplicationUserServiceImpl applicationUserService) {
+        super(disableDefaults);
+        this.passwordEncoder = passwordEncoder;
+        this.applicationUserService = applicationUserService;
     }
 
     @Override
@@ -67,33 +70,17 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
                     .logoutSuccessUrl("/login");
     }
 
-    @Override
     @Bean
-    protected UserDetailsService userDetailsService() {
+    DaoAuthenticationProvider daoAuthenticationProvider(){
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setPasswordEncoder(passwordEncoder);
+        provider.setUserDetailsService(applicationUserService);
 
-        UserDetails annaSmithUser = User.builder()
-                .username("annasmith")
-                .password(passwordEncoder.encode("password"))
-                // .roles(STUDENT.name())   // ROLE_STUDENT
-                .authorities(STUDENT.getGrantedAuthorities())
-                .build();
+        return provider;
+    }
 
-        UserDetails lindaUser = User.builder()
-                .username("linda")
-                .password(passwordEncoder.encode("password"))
-                // .roles(ADMIN.name())   // ROLE_ADMIN
-                .authorities(ADMIN.getGrantedAuthorities())
-                .build();
-
-        UserDetails tomUser = User.builder()
-                .username("tom")
-                .password(passwordEncoder.encode("password"))
-                // .roles(ADMINTRAINEE.name())   // ROLE_ADMINTRAINEE
-                .authorities(ADMINTRAINEE.getGrantedAuthorities())
-                .build();
-
-        return new InMemoryUserDetailsManager(
-                annaSmithUser, lindaUser, tomUser
-        );
+    @Override
+    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+        auth.authenticationProvider(daoAuthenticationProvider());
     }
 }
